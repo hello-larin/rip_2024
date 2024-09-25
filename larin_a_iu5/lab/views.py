@@ -1,5 +1,5 @@
 from django.shortcuts import render
-
+from lab.models import *
 
 cart_id = [{
     "customer_address": "Москва ул. Иваново стр. 23/3",
@@ -34,39 +34,51 @@ data = [
     ]
 
 def GetLaboratoryCatalog(request):
+    print(LaboratoryItem.objects.all())
     product_price = request.GET.get("laboratory-price")
     if product_price != None:
-        product_price = int(product_price)
-        result = []
-        for i in data:
-            if i['price'] < product_price:
-                result.append(i)
         return render(request, 'laboratory_catalog.html', {
-            'data': result,
+            'data': LaboratoryItem.objects.filter(price__lte = int(product_price)),
             'searched_price': product_price,
-            'cart': len(cart_id[0]['items'])
+            'cart': LaboratoryOrderItems.objects.filter(order=1).count()
         })
     return render(request, 'laboratory_catalog.html', {
-        'data': data,
-        'cart': len(cart_id[0]["items"])
+        'data': LaboratoryItem.objects.all(),
+        'cart': LaboratoryOrderItems.objects.filter(order=1).count()
     })
 
 
-def GetLaboratoryItemInformation(request, id):
+def GetLaboratoryItemInformation(request, selected_id):
     return render(request, 'laboratory_item_information.html', {
-        'data': data[id],
-        'cart': len(cart_id[0]["items"])})
+        'data': LaboratoryItem.objects.filter(id=selected_id),
+        'cart': LaboratoryOrderItems.objects.filter(order=1).count()})
 # Create your views here.
 
 def GetLaboratoryCart(request, id):
-    result = cart_id[0]
-    result["final_price"] = 0
-    for i in data:
-        for j in result["items"]:
-            if i['id'] == j['item_id']:
-                j["name"] = i["name"]
-                j["description"] = i["description"]
-                j["price"] = i["price"]
-                j["image"] = i["image"]
-                result["final_price"] += j["price"] * j["count"]
-    return render(request, 'laboratory_cart.html', result)
+    a = LaboratoryItem.objects.filter(laboratoryorderitems__order=1)
+    final_price = 0
+    for i in a:
+        final_price += 1
+        #final_price += i['price']
+    return render(request, 'laboratory_cart.html', {
+        'data': LaboratoryItem.objects.filter(laboratoryorderitems__order=1),
+        'final_price': final_price
+    })
+
+def AddLaboratoryItem(request, selected_id):
+    writing_count = request.POST['this_product_count']
+    for_key = LaboratoryOrder.objects.filter(id=1)[0]
+    pr_id = LaboratoryItem.objects.filter(id=selected_id)[0]
+    item = LaboratoryOrderItems(order=for_key, product_id=pr_id, amount=writing_count)
+    item.save()
+    return render(request, 'laboratory_item_information.html', {
+        'data': LaboratoryItem.objects.filter(id=selected_id),
+        'cart': LaboratoryOrderItems.objects.filter(order=1).count()})
+
+def DelLaboratoryItem(request, selected_id):
+    LaboratoryOrderItems.objects.filter(order=selected_id).delete()
+    final_price = 0
+    return render(request, 'laboratory_cart.html', {
+        'data': LaboratoryItem.objects.filter(laboratoryorderitems__order=1),
+        'final_price': final_price
+    })

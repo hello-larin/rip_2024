@@ -17,6 +17,7 @@ x-minio-common: &minio-common
   expose:
     - "9000" # открыть порты
     - "9001"
+    - "5432"
     # environment:
     # MINIO_ROOT_USER: minioadmin
     # MINIO_ROOT_PASSWORD: minioadmin
@@ -73,8 +74,15 @@ services:
       - minio2
       - minio3
       - minio4
-  
-
+  pgadmin:
+    container_name: pgadmin4_container
+    image: dpage/pgadmin4
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: larinalesha@mail.ru
+      PGADMIN_DEFAULT_PASSWORD: root
+    ports:
+      - "5050:80"
 ## По умолчанию в этой конфигурации используется локальный драйвер docker по умолчанию,
 ## Для пользовательских томов замените на конфигурацию драйвера тома.
 volumes:

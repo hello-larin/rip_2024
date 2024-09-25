@@ -21,13 +21,24 @@
     </div>
 </div>
     <div class="container">
-        <div class="product">
-            <img src="{{data.image}}" alt="Продукт" class="product-image">
-            <div class="product-details">
-                <h2>{{data.name}}</h2>
-                <p>{{data.description}}</p>
-                <p class="price">{{data.price}} Р</p>
-            </div>
-        </div>
+        {% for product in data %}
+                
+                <div class="product">
+                    <img src="{{product.image}}" alt="Продукт" class="product-image">
+                    <div class="product-details">
+                        <h2>{{product.name}}</h2>
+                        <p>{{product.description}}</p>
+                        <p class="price">{{product.price}} Р</p>
+                        <form method="post" action="/laboratory_item/{{product.id}}/add_to_order/">
+                            {% csrf_token %}
+                            <!-- Скрытое поле для параметра поиска -->
+                            <input name="this_product_count" value="">
+                            <button class="btn btn-outline-dark btn-sm" type="submit">Добавить</button>
+                        </form>
+                    </div>
+                </div>
+                {% empty %}
+                    <p>Список пуст</p>
+            {% endfor %}
     </div>
 {% endblock %}
