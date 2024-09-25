@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block title %}Корзина{% endblock %}
+
+{% block style %} <link rel="stylesheet" href="{% static 'css/cart.css' %}"> {% endblock %}
+
+{% block content %}
+
+<header class="header" style="background-image:url(https://loip.ru/bitrix/templates/main/img/header.jpg);">
+    <div class="logo" >
+        <a href="/" style="background:rgb(0,0,0,0);">ООО ЛабОборудование <br>8 800 555 35 35</a>
+    </div>
+</header>
+    
+    <div class="container">
+        <form action="order_complete" method="post" enctype="multipart/form-data" class="product-card product-info">
+            <p><b>Ваш адресс:</b><br>
+                <input type="text" size="100">
+            </p>
+            <p><b>Номер телефона:</b><br>
+                <input type="text" size="100">
+            </p>
+        </form>
+        {% for product in items %}
+                {% include 'laboratory_selected_item.html' with element=product %}
+                {% empty %}
+                    <p>Список пуст</p>
+        {% endfor %}
+        </div>
+        <div class="total">
+            <h2>Итого: {{ final_price }}</h2>
+        </div>
+    </div>
+
+    {% endblock %}
