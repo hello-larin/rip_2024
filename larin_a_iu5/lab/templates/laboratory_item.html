@@ -3,4 +3,10 @@
 </br></br>
     <b><a href="{% url 'laboratory_item' element.id %}" class="button">{{element.name}}</a></b>
     <p>{{element.price}} P</p>
+    <form method="post" action="add_to_order/">
+        {% csrf_token %}
+        <input type="hidden" value="{{element.id}}" name="selected_product">
+        <input name="this_product_count" value="">
+        <button class="btn btn-outline-dark btn-sm" type="submit">Добавить</button>
+    </form>
 </div>

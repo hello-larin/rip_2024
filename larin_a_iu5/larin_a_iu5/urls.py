@@ -24,6 +24,6 @@ urlpatterns = [
     path('', views.GetLaboratoryCatalog),
     path('laboratory_item/<int:selected_id>', views.GetLaboratoryItemInformation, name='laboratory_item'),
     path('laboratory_cart/<int:id>', views.GetLaboratoryCart, name='laboratory_cart'),
-    path('laboratory_item/<int:selected_id>/add_to_order/', views.AddLaboratoryItem),
+    path('add_to_order/', views.AddLaboratoryItem),
     path('laboratory_cart/<int:selected_id>/del_order/', views.DelLaboratoryItem)
 ]
