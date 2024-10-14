@@ -23,25 +23,31 @@ def user():
 @api_view(["GET", "POST"])
 def laboratory_catalog(request):
     if request.method == 'GET':
-        products = LaboratoryItem.objects.all()
-        serializer = ProductSerializer(products, many=True)
+        try:
+            parsed_data = JSONParser().parse(request)
+            if parsed_data['price'] != None:
+                equipment = LaboratoryItem.objects.filter(price__lte = parsed_data['price'])
+            else:
+                equipment = LaboratoryItem.objects.all()
+        except:
+            equipment = LaboratoryItem.objects.all()
+        serializer = EquipmentSerializer(equipment, many=True)
         printed_count = None
-        selected_cart_id = None
+        selected_procurement_id = None
         selected_user = user()
-        selected_cart = LaboratoryOrder.objects.filter(status=1, user=selected_user.id)
-        if selected_cart.count() != 0:
-            selected_cart_id = selected_cart[0].id
-            printed_count = LaboratoryOrderItems.objects.filter(order=selected_cart_id).count()
+        selected_procurement = LaboratoryOrder.objects.filter(status=1, user=selected_user.id)
+        if selected_procurement.count() != 0:
+            selected_procurement_id = selected_procurement[0].id
+            printed_count = LaboratoryOrderItems.objects.filter(order=selected_procurement_id).count()
         response = {
-            "products": serializer.data,
-            "cart_id": selected_cart_id,
-            "cart_count": printed_count,
-            "user_id": selected_user.id
+            "equipment": serializer.data,
+            "procurement_id": selected_procurement_id,
+            "procurement_count": printed_count,
         }
         return Response(response, status=status.HTTP_200_OK)
     elif request.method == 'POST':
         parsed_data = JSONParser().parse(request)
-        serializer = ProductSerializer(data=parsed_data)
+        serializer = EquipmentSerializer(data=parsed_data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK) 
@@ -49,49 +55,49 @@ def laboratory_catalog(request):
 
 
 @api_view(["GET", "PUT", "DELETE", "POST"])
-def laboratory_product(request, id):
+def laboratory_equipment(request, id):
     try: 
-        product = LaboratoryItem.objects.get(id=id) 
+        equipment = LaboratoryItem.objects.get(id=id) 
     except LaboratoryItem.DoesNotExist: 
-        return Response({"message": "Product not found"}, status=status.HTTP_200_OK)
+        return Response({"message": "equipment not found"}, status=status.HTTP_200_OK)
     if request.method == 'GET':
-        serializer = ProductSerializer(product)
+        serializer = EquipmentSerializer(equipment)
         response = serializer.data
         return Response(response, status=status.HTTP_200_OK)
     elif request.method == 'PUT':
         parsed_data = JSONParser().parse(request)
         if 'pic' in parsed_data:
-            pic_result = add_pic(product, parsed_data.initial_data['pic'])
+            pic_result = add_pic(equipment, parsed_data.initial_data['pic'])
             if 'error' in pic_result.data:
                 return Response({"message": pic_result}, status=status.HTTP_400_BAD_REQUEST)
-        serializer = ProductSerializer(product, data=parsed_data, partial=True) 
+        serializer = EquipmentSerializer(equipment, data=parsed_data, partial=True) 
         if serializer.is_valid(): 
             serializer.save() 
             return Response(serializer.data, status=status.HTTP_200_OK) 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST) 
     elif request.method == 'DELETE':
-        pic_result = del_pic(product)
+        pic_result = del_pic(equipment)
         if 'error' in pic_result:
             return Response({"message": pic_result}, status=status.HTTP_400_BAD_REQUEST)
-        product.delete() 
-        return Response({"message": "Product was deleted successfully!"}, status=status.HTTP_200_OK)
+        equipment.delete() 
+        return Response({"message": "equipment was deleted successfully!"}, status=status.HTTP_200_OK)
     elif request.method == 'POST':
         # Используем MultiPartParser для обработки файлов
         pic_file = request.FILES['pic']
         # Проверяем наличие файла в parsed_data
         if pic_file != None:
-            pic_result = add_pic(product, pic_file)
+            pic_result = add_pic(equipment, pic_file)
             if 'error' in pic_result:
                 return Response({"message": pic_result}, status=status.HTTP_400_BAD_REQUEST)
-            product.image = pic_result["message"]
-            product.save()
-            serializer = ProductSerializer(LaboratoryItem.objects.get(id=id) ) 
+            equipment.image = pic_result["message"]
+            equipment.save()
+            serializer = EquipmentSerializer(LaboratoryItem.objects.get(id=id) ) 
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response({"message": "not a image"}, status=status.HTTP_400_BAD_REQUEST) 
     
 
 @api_view(["GET", "POST"])
-def laboratory_carts(request):
+def laboratory_procurements(request):
     if request.method == 'GET':
         orders =  LaboratoryOrder.objects.filter(status__gte = 3).order_by('created_date', 'status')
         if orders.count() == 0:
@@ -109,26 +115,26 @@ def laboratory_carts(request):
 
 
 @api_view(["GET", "PUT", "DELETE"])
-def laboratory_cart(request, id):
+def laboratory_procurement(request, id):
     try: 
-        cart = LaboratoryOrder.objects.get(id=id) 
+        procurement = LaboratoryOrder.objects.get(id=id) 
     except LaboratoryOrder.DoesNotExist: 
         return Response(None, status=status.HTTP_200_OK)
     if request.method == 'GET':
-        serializer = CartSerializer(cart)
+        serializer = ProcurementSerializer(procurement)
         response = serializer.data
         return Response(response, status=status.HTTP_200_OK)
     elif request.method == 'PUT':
         parsed_data = JSONParser().parse(request)
-        serializer = EditCartSerializer(cart, data=parsed_data, partial=True) 
+        serializer = EditProcurementSerializer(procurement, data=parsed_data, partial=True) 
         if serializer.is_valid(): 
             serializer.save() 
             return Response(serializer.data) 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST) 
     elif request.method == 'DELETE':
-        cart.status = 2
-        cart.save() 
-        return Response({"message": "Cart was deleted successfully!"}, status=status.HTTP_200_OK)
+        procurement.status = 2
+        procurement.save() 
+        return Response({"message": "procurement was deleted successfully!"}, status=status.HTTP_200_OK)
 
 
 @api_view(["POST"])
@@ -138,22 +144,22 @@ def add_item(request, id):
         return Response({"message": "No amount"}, status=status.HTTP_400_BAD_REQUEST)
     selected_user = user()
     try: 
-        cart = LaboratoryOrder.objects.get(user=selected_user, status=1) 
+        procurement = LaboratoryOrder.objects.get(user=selected_user, status=1) 
     except LaboratoryOrder.DoesNotExist: 
-        cart = LaboratoryOrder(user=selected_user, status=1)
-        cart.save()
+        procurement = LaboratoryOrder(user=selected_user, status=1)
+        procurement.save()
     try:
-        product = LaboratoryItem.objects.get(id=id)
+        equipment = LaboratoryItem.objects.get(id=id)
     except LaboratoryItem.DoesNotExist:
-        return Response({"message": "Product with id={id} does not exist"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"message": "equipment with id={id} does not exist"}, status=status.HTTP_400_BAD_REQUEST)
     try: 
-        item = LaboratoryOrderItems.objects.get(order=cart, product_id=product) 
+        item = LaboratoryOrderItems.objects.get(order=procurement, product_id=equipment) 
     except LaboratoryOrderItems.DoesNotExist: 
-        item = LaboratoryOrderItems(order=cart, product_id=product, amount=0)
+        item = LaboratoryOrderItems(order=procurement, product_id=equipment, amount=0)
     item.amount += parsed_data['amount']
     item.save()
-    cart_items = LaboratoryOrderItems.objects.filter(order=cart)
-    serializer = ItemsSerializer(cart_items, many=True)
+    procurement_items = LaboratoryOrderItems.objects.filter(order=procurement)
+    serializer = ItemsSerializer(procurement_items, many=True)
     response = serializer.data
     return Response(response, status=status.HTTP_200_OK)
 
@@ -205,30 +211,30 @@ def user_deauth(request):
 
 
 @api_view(["POST"])
-def submit_cart(request, id):
+def submit_procurement(request, id):
     try: 
-        cart = LaboratoryOrder.objects.get(id=id, status=1) 
+        procurement = LaboratoryOrder.objects.get(id=id, status=1) 
     except LaboratoryOrder.DoesNotExist: 
         return Response(None, status=status.HTTP_200_OK)
-    if cart.phone != None and cart.address != None:
-        cart.status = 3
-        cart.submited_date = datetime.date.today()
-        cart.save()
-        serializers = CartSerializer(cart)
+    if procurement.phone != None and procurement.address != None:
+        procurement.status = 3
+        procurement.submited_date = datetime.datetime.now()
+        procurement.save()
+        serializers = ProcurementSerializer(procurement)
         return Response(serializers.data, status=status.HTTP_200_OK)
     return Response({"message": "Not valid"}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(["POST"])
-def accept_cart(request, id):
+def accept_procurement(request, id):
     try: 
-        cart = LaboratoryOrder.objects.get(id=id, status=3) 
+        procurement = LaboratoryOrder.objects.get(id=id, status=3) 
     except LaboratoryOrder.DoesNotExist: 
-        return Response({"message": "cart not found"}, status=status.HTTP_200_OK)
-    if cart.phone != None and cart.address != None and cart.submited_date != None:
-        cart.status = 4
-        cart.accepted_date = datetime.date.today()
-        cart.save()
-        serializers = CartSerializer(cart)
+        return Response({"message": "procurement not found"}, status=status.HTTP_200_OK)
+    if procurement.phone != None and procurement.address != None and procurement.submited_date != None:
+        procurement.status = 4
+        procurement.accepted_date = datetime.now
+        procurement.save()
+        serializers = ProcurementSerializer(procurement)
         return Response(serializers.data, status=status.HTTP_200_OK)
     return Response({"message": "Not valid"}, status=status.HTTP_400_BAD_REQUEST)
 

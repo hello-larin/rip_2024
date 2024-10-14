@@ -128,6 +128,7 @@ class LaboratoryItem(models.Model):
     description = models.TextField(blank=True, null=True)
     price = models.IntegerField()
     image = models.TextField(blank=True, null=True)
+    status = models.BooleanField(default=1)
 
     class Meta:
         db_table = 'laboratory_item'
@@ -137,10 +138,10 @@ class LaboratoryOrder(models.Model):
     id = models.BigAutoField(primary_key=True)
     address = models.TextField(blank=True, null=True)
     phone = models.CharField(max_length=15, blank=True, null=True)
-    accepted_date = models.DateField(blank=True, null=True)
-    created_date = models.DateField(blank=True, null=True, auto_now=True)
+    accepted_date = models.DateTimeField(blank=True, null=True)
+    created_date = models.DateTimeField(blank=True, null=True, auto_now=True)
     status = models.IntegerField()
-    submited_date = models.DateField(blank=True, null=True)
+    submited_date = models.DateTimeField(blank=True, null=True)
     user = models.ForeignKey('AuthUser', on_delete=models.DO_NOTHING, null=True, blank=False, related_name='orders')
 
 
@@ -151,8 +152,8 @@ class LaboratoryOrder(models.Model):
 class LaboratoryOrderItems(models.Model):
     id = models.BigAutoField(primary_key=True)
     amount = models.IntegerField()
-    order = models.ForeignKey(LaboratoryOrder, models.DO_NOTHING, related_name='orders')
-    product_id = models.ForeignKey(LaboratoryItem, models.DO_NOTHING, related_name='products')
+    order = models.ForeignKey(LaboratoryOrder, models.DO_NOTHING, related_name='equipment')
+    product_id = models.ForeignKey(LaboratoryItem, models.DO_NOTHING, related_name='equipment')
 
     class Meta:
         db_table = 'laboratory_order_items'

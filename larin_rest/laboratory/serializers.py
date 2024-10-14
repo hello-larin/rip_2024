@@ -2,41 +2,36 @@ from rest_framework import serializers
 from laboratory.models import *
 
 class OrdersSerializer(serializers.ModelSerializer):
+    user = serializers.CharField(source='user.username')
     class Meta:
         model = LaboratoryOrder
         fields = ["id", "address", "phone", "created_date", "submited_date", "accepted_date", "status", "user"]
 
 
-class ProductSerializer(serializers.ModelSerializer):
+class EquipmentSerializer(serializers.ModelSerializer):
     
     class Meta:
         # Модель, которую мы сериализуем
         model = LaboratoryItem
         # Поля, которые мы сериализуем
-        fields = ["id", "name", "price", "description", "image"]
-
-
-class ProductItemSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = LaboratoryItem
-        fields = ["id", "name", "price"]
-
+        fields = ["id", "name", "price", "description", "image", "status"]
 
 class ItemsSerializer(serializers.ModelSerializer):
-    product_name = serializers.CharField(source='product_id.name')
-    product_price = serializers.CharField(source='product_id.price')
+    name = serializers.CharField(source='product_id.name')
+    price = serializers.CharField(source='product_id.price')
+    image = serializers.CharField(source='product_id.image')
     class Meta:
         # Модель, которую мы сериализуем
         model = LaboratoryOrderItems
         # Поля, которые мы сериализуем
-        fields = ["product_name", "product_price", "amount", "id"]
+        fields = ["name", "price", "amount", "id", "image"]
     
 
-class CartSerializer(serializers.ModelSerializer):
-    orders = ItemsSerializer(many=True, read_only=True)
+class ProcurementSerializer(serializers.ModelSerializer):
+    equipment = ItemsSerializer(many=True, read_only=True)
     class Meta:
         model = LaboratoryOrder
-        fields = ["id", "address", "phone", "created_date", "submited_date", "accepted_date", "status", "orders"]
+        fields = ["id", "address", "phone", "created_date", "submited_date", "accepted_date", "status", "equipment"]
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -46,19 +41,19 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class EditUserSerializer(serializers.ModelSerializer):
-    orders = CartSerializer(many=True, read_only=True)
+    equipment = ProcurementSerializer(many=True, read_only=True)
     class Meta:
         model = AuthUser
-        fields = ["first_name", "last_name", "email", "password", "orders"]
+        fields = ["first_name", "last_name", "email", "password", "equipment"]
 
 
-class EditCartSerializer(serializers.ModelSerializer):
-    orders = ItemsSerializer(many=True, read_only=True)
+class EditProcurementSerializer(serializers.ModelSerializer):
+    equipment = ItemsSerializer(many=True, read_only=True)
     class Meta:
         model = LaboratoryOrder
-        fields = ["address", "phone", "created_date", "orders"]
+        fields = ["address", "phone", "created_date", "equipment"]
 
 class EditItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = LaboratoryOrderItems
-        fields = ["id", "product_id", "order", "amount"]
+        fields = ["id", "product_id", "equipment", "amount"]
