@@ -232,7 +232,7 @@ def accept_procurement(request, id):
         return Response({"message": "procurement not found"}, status=status.HTTP_200_OK)
     if procurement.phone != None and procurement.address != None and procurement.submited_date != None:
         procurement.status = 4
-        procurement.accepted_date = datetime.now
+        procurement.accepted_date = datetime.datetime.now()
         procurement.save()
         serializers = ProcurementSerializer(procurement)
         return Response(serializers.data, status=status.HTTP_200_OK)
