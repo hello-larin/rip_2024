@@ -99,7 +99,20 @@ def laboratory_equipment(request, id):
 @api_view(["GET", "POST"])
 def laboratory_procurements(request):
     if request.method == 'GET':
-        orders =  LaboratoryOrder.objects.filter(status__gte = 3).order_by('created_date', 'status')
+        try:
+            parsed_data = JSONParser().parse(request)
+            if 'status' in parsed_data.keys() and 'start_date' in parsed_data.keys() and 'end_date' in parsed_data.keys():
+                procurement = LaboratoryOrder.objects.filter(status=parsed_data['status'],
+                                                 created_date__range=(parsed_data['start_date'], parsed_data['end_date']))
+            elif 'status' in parsed_data.keys():
+                procurement = LaboratoryOrder.objects.filter(status=parsed_data['status'])
+            elif 'start_date' in parsed_data.keys() and 'end_date' in parsed_data.keys():
+                procurement = LaboratoryOrder.objects.filter(created_date__range=(parsed_data['start_date'], parsed_data['end_date']),
+                                                  status__gte = 3)
+            else:
+                procurement =  LaboratoryOrder.objects.filter(status__gte = 3).order_by('created_date', 'status')
+        except:
+            procurement =  LaboratoryOrder.objects.filter(status__gte = 3).order_by('created_date', 'status')
         if orders.count() == 0:
             orders = None
         serializer = OrdersSerializer(orders, many=True)
