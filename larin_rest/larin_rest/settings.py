@@ -40,10 +40,15 @@ INSTALLED_APPS = [
     
     # DRF
     'rest_framework',
+    
+    #Swagger
+    'drf_yasg',
 
     # Наше приложение
     'laboratory',
 ]
+
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -137,3 +142,6 @@ AWS_ACCESS_KEY_ID = 'minio'
 AWS_SECRET_ACCESS_KEY = 'minio124'
 AWS_S3_ENDPOINT_URL = 'localhost:9000'
 MINIO_USE_SSL = False
+
+REDIS_HOST = 'localhost'
+REDIS_PORT = 6379

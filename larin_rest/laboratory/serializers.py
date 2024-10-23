@@ -1,11 +1,17 @@
 from rest_framework import serializers
 from laboratory.models import *
 
+class UsernameSerialzer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["username"]
+
 class OrdersSerializer(serializers.ModelSerializer):
-    user = serializers.CharField(source='user.username')
+    creator = serializers.CharField(source="user.username", allow_null=True)
+    moderator = serializers.CharField(source="moderator.username", allow_null=True)
     class Meta:
         model = LaboratoryOrder
-        fields = ["id", "address", "phone", "created_date", "submited_date", "accepted_date", "status", "user"]
+        fields = ["id", "address", "phone", "created_date", "submited_date", "accepted_date", "status", "creator", "moderator"]
 
 
 class EquipmentSerializer(serializers.ModelSerializer):
@@ -36,15 +42,34 @@ class ProcurementSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
-        model = AuthUser
-        fields = ["username", "password", "email"]
+        model = User
+        fields = ["username", "password", "is_staff", "is_superuser"]
 
+class AuthSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["username", "password"]
+
+
+class RegisterSerializer(serializers.ModelSerializer):
+    is_staff = serializers.BooleanField(default=False, required=False)
+    is_superuser = serializers.BooleanField(default=False, required=False)
+    class Meta:
+        model = User
+        fields = ['username','password','is_staff','is_superuser']
+    
+    def create(self, validated_data):
+        user = super().create(validated_data)
+        if 'password' in validated_data:
+            user.set_password(validated_data['password'])
+            user.save()
+        return user
 
 class EditUserSerializer(serializers.ModelSerializer):
     equipment = ProcurementSerializer(many=True, read_only=True)
     class Meta:
-        model = AuthUser
-        fields = ["first_name", "last_name", "email", "password", "equipment"]
+        model = User
+        fields = ["first_name", "last_name", "password", "equipment"]
 
 
 class EditProcurementSerializer(serializers.ModelSerializer):
@@ -57,3 +82,5 @@ class EditItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = LaboratoryOrderItems
         fields = ["id", "product_id", "equipment", "amount"]
+
+
