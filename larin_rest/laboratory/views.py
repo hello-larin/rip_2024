@@ -27,15 +27,6 @@ def method_permission_classes(classes):
         return decorated_func
     return decorator
 
-#def method_authentication_classes(classes):
-#    def decorator(func):
-#        def decorated_func(self, *args, **kwargs):
-#            self.authentication_classes = classes        
-#            self.authenticate(self.request)
-#            return func(self, *args, **kwargs)
-#        return decorated_func
-#    return decorator
-
 def get_user(request):
     session_id = request.COOKIES.get("session_id")
     if session_id is None:
@@ -50,7 +41,6 @@ def get_user(request):
             print("cant get user")
             user = None
             return user
-        return None
     
 
 class laboratory_catalog(APIView):
@@ -222,7 +212,6 @@ class laboratory_procurement(APIView):
 @swagger_auto_schema(method='post', request_body=ItemsSerializer)
 @api_view(["POST"])
 @permission_classes([IsAuth])
-@authentication_classes([AuthBySessionID])
 def add_item(request, id):
     parsed_data = JSONParser().parse(request)
     if parsed_data['amount'] == None:
