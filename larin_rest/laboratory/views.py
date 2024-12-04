@@ -16,7 +16,32 @@ from django.contrib.auth import authenticate, login, logout
 from rest_framework.permissions import *
 from django.views.decorators.csrf import csrf_exempt
 import uuid
+
+from drf_yasg import openapi
+import hashlib
+
 # Create your views here.
+
+def hash_delivery(username, address, phone):
+    input_string = f"{id}{address}{phone}{username}"
+
+    # Создаем хэш SHA-256
+    hash_object = hashlib.sha256(input_string.encode())
+    hash_hex = hash_object.hexdigest()
+
+    # Преобразуем хэш в base64 и берем первые 3 символа
+    hash_base64 = base64.b64encode(hash_object.digest()).decode()
+    prefix = hash_base64[:3].upper()
+
+    # Преобразуем хэш в число и берем первые 8 цифр
+    hash_int = int(hash_hex, 16)
+    suffix = str(hash_int)[:8]
+
+    # Формируем окончательный хэш
+    unique_hash = f"{prefix}{suffix}"
+
+    return unique_hash
+
 
 def method_permission_classes(classes):
     def decorator(func):
@@ -44,12 +69,14 @@ def get_user(request):
     
 
 class laboratory_catalog(APIView):
+    @swagger_auto_schema(responses={200: EquipmentResponseSerializer()})
     @method_permission_classes([AllowAny])
     def get(self, request, format=None):
         try:
-            parsed_data = JSONParser().parse(request)
-            if parsed_data['price'] != None:
-                equipment = LaboratoryItem.objects.filter(price__lte = parsed_data['price'])
+            price = request.GET.get("price")
+            print(price)
+            if price != None:
+                equipment = LaboratoryItem.objects.filter(price__lte = price)
             else:
                 equipment = LaboratoryItem.objects.all()
         except:
@@ -87,6 +114,7 @@ class laboratory_catalog(APIView):
 
 
 class laboratory_equipment(APIView):
+    @swagger_auto_schema(responses={200: EquipmentSerializer()})
     @permission_classes([AllowAny])
     def get(self, request, id, format=None):
         try: 
@@ -149,32 +177,26 @@ class laboratory_equipment(APIView):
 
 
 class laboratory_procurements(APIView):
+    @swagger_auto_schema(responses={200: OrdersSerializer(many=True)},
+                         )
     def get(self, request):
         user = get_user(request)
         if user is None:
             return Response({"message": "no active session"}, status=status.HTTP_400_BAD_REQUEST)
         if user.is_superuser or user.is_staff:
-            orders =  LaboratoryOrder.objects.filter(status__gte = 3).order_by('created_date', 'status')    
+            orders =  LaboratoryOrder.objects.filter(status__gte = 3).order_by('created_date', 'status')   
         else:
+            print("order start user") 
             orders = LaboratoryOrder.objects.filter(user=user)
         if orders.count() == 0:
-            return Response({"message": "no procurements"},status=status.HTTP_204_NO_CONTENT)
+            print("order start") 
+            return Response([],status=status.HTTP_200_OK)
         serializer = OrdersSerializer(orders, many=True)
         response = serializer.data
         return Response(response, status=status.HTTP_200_OK)
-    
-    @authentication_classes([IsAdminAuth,])
-    @swagger_auto_schema(request_body=OrdersSerializer)
-    def post(self, request):
-        parsed_data = JSONParser().parse(request)
-        serializer = OrdersSerializer(data=parsed_data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK) 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
 
 class laboratory_procurement(APIView):
+    @swagger_auto_schema(responses={200: OrdersSerializer()})
     def get(self, request, id):
         user = get_user(request)
         try: 
@@ -185,6 +207,8 @@ class laboratory_procurement(APIView):
         response = serializer.data
         return Response(response, status=status.HTTP_200_OK)
     
+    @swagger_auto_schema(request_body=EditProcurementSerializer,
+                         responses={200: EditProcurementSerializer()})
     def put(self, request, id):
         user = get_user(request)
         try: 
@@ -209,11 +233,13 @@ class laboratory_procurement(APIView):
         return Response({"message": "procurement was deleted successfully!"}, status=status.HTTP_200_OK)
 
 
-@swagger_auto_schema(method='post', request_body=ItemsSerializer)
+@swagger_auto_schema(method='post', request_body=AmountRequestSerializer(),
+                     responses={200: ItemsSerializer(many=True)})
 @api_view(["POST"])
 @permission_classes([IsAuth])
 def add_item(request, id):
-    parsed_data = JSONParser().parse(request)
+    parsed_data = {}
+    parsed_data['amount'] = request.data.get("amount")
     if parsed_data['amount'] == None:
         return Response({"message": "No amount"}, status=status.HTTP_400_BAD_REQUEST)
     selected_user = request.user
@@ -233,7 +259,10 @@ def add_item(request, id):
     except LaboratoryOrderItems.DoesNotExist: 
         item = LaboratoryOrderItems(order=procurement, product_id=equipment, amount=0)
     item.amount += parsed_data['amount']
-    item.save()
+    if item.amount <= 0:
+        item.delete()
+    else:
+        item.save()
     procurement_items = LaboratoryOrderItems.objects.filter(order=procurement)
     serializer = ItemsSerializer(procurement_items, many=True)
     response = serializer.data
@@ -241,23 +270,33 @@ def add_item(request, id):
 
 
 class user_registration(APIView):
+    @swagger_auto_schema(responses={200: UserSerializer()})
+    def get(self, request):
+        user = get_user(request)
+        if user == None:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        serializer = UserSerializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     
-    @swagger_auto_schema(request_body=EditUserSerializer)
+    @swagger_auto_schema(request_body=EditUserSerializer,
+                         responses={200: UserSerializer()})
     def put(self, request):
         parsed_data = JSONParser().parse(request)
-        try:
-            user = User.objects.get(username = parsed_data['username'], password = parsed_data['password'])
-        except User.DoesNotExist:
-            return Response({"message": "Cant login"}, status=status.HTTP_400_BAD_REQUEST)
+        user = get_user(request)
+        if user == None:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
         serializer = EditUserSerializer(user, data=parsed_data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            user = get_user(request)
+            serializer = UserSerializer(user)
         else:
             return Response({"message": "Bad data"}, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-@swagger_auto_schema(method='post', request_body=RegisterSerializer)
+@swagger_auto_schema(method='post', request_body=RegisterSerializer,
+                     responses={201: RegisterSerializer()})
 @csrf_exempt
 @api_view(['Post'])
 @permission_classes([AllowAny])
@@ -272,7 +311,8 @@ def register(request, format=None):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@swagger_auto_schema(method='post', request_body=AuthSerializer)
+@swagger_auto_schema(method='post', request_body=AuthSerializer,
+                     responses={200: UserSerializer()})
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @authentication_classes([])
@@ -285,7 +325,8 @@ def user_auth(request):
         login(request, user)
         random_key = str(uuid.uuid4())
         session_storage.set(random_key, username)
-        response = Response(status=status.HTTP_200_OK)
+        serializer = UserSerializer(user)
+        response = Response(serializer.data, status=status.HTTP_200_OK)
         response.set_cookie("session_id", random_key, samesite="lax")
         return response
     else:
@@ -305,7 +346,7 @@ def user_deauth(request):
     return Response({'message': 'Success'})
 
 
-@swagger_auto_schema(method='post', request_body=ProcurementSerializer)
+@swagger_auto_schema(method='post', responses={200: ProcurementSerializer()})
 @api_view(["POST"])
 def submit_procurement(request, id):
     user = get_user(request)
@@ -316,13 +357,14 @@ def submit_procurement(request, id):
     if procurement.phone != None and procurement.address != None:
         procurement.status = 3
         procurement.submited_date = datetime.datetime.now()
+        procurement.delivery_number = hash_delivery(procurement.user.username, procurement.address, procurement.phone)
         procurement.save()
         serializers = ProcurementSerializer(procurement)
         return Response(serializers.data, status=status.HTTP_200_OK)
     return Response({"message": "Not valid"}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@swagger_auto_schema(method='post', request_body=ProcurementSerializer)
+@swagger_auto_schema(method='post', responses={200: ProcurementSerializer()})
 @api_view(["POST"])
 @permission_classes([IsManagerAuth])
 def accept_procurement(request, id):
@@ -342,7 +384,8 @@ def accept_procurement(request, id):
 
 
 class one_item(APIView):
-    @swagger_auto_schema(request_body=ItemsSerializer)
+    @swagger_auto_schema(request_body=ItemsSerializer, 
+                         responses={200: ItemsSerializer(many=True)})
     def put(self, request, id):
         user = user(request)
         try: 

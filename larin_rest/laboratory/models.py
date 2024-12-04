@@ -36,6 +36,7 @@ class LaboratoryOrder(models.Model):
     submited_date = models.DateTimeField(blank=True, null=True)
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, null=True, blank=False, related_name='creator')
     moderator = models.ForeignKey(User, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='moderator_name')
+    delivery_number = models.CharField(max_length=16, blank=True, null=True)
 
 
     class Meta:

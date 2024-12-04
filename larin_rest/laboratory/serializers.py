@@ -6,6 +6,12 @@ class UsernameSerialzer(serializers.ModelSerializer):
         model = User
         fields = ["username"]
 
+class AmountRequestSerializer(serializers.Serializer):
+    amount = serializers.IntegerField()
+    
+class MessageSerializer(serializers.Serializer):
+    message = serializers.CharField()
+
 class OrdersSerializer(serializers.ModelSerializer):
     creator = serializers.CharField(source="user.username", allow_null=True)
     moderator = serializers.CharField(source="moderator.username", allow_null=True)
@@ -21,6 +27,11 @@ class EquipmentSerializer(serializers.ModelSerializer):
         model = LaboratoryItem
         # Поля, которые мы сериализуем
         fields = ["id", "name", "price", "description", "image", "status"]
+
+class EquipmentResponseSerializer(serializers.Serializer):
+    equipment = EquipmentSerializer(many=True)
+    procurement_id = serializers.IntegerField()
+    procurement_count = serializers.IntegerField()
 
 class ItemsSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source='product_id.name')
@@ -43,7 +54,7 @@ class ProcurementSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["username", "password", "is_staff", "is_superuser"]
+        fields = ["username", "last_name", "first_name"]
 
 class AuthSerializer(serializers.ModelSerializer):
     class Meta:
@@ -66,10 +77,14 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 class EditUserSerializer(serializers.ModelSerializer):
-    equipment = ProcurementSerializer(many=True, read_only=True)
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "password", "equipment"]
+        fields = ["first_name", "last_name", "username"]
+        extra_kwargs = {
+            'first_name': {'required': False},
+            'last_name': {'required': False},
+            'username': {'required': False}
+        }
 
 
 class EditProcurementSerializer(serializers.ModelSerializer):
