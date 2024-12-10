@@ -61,6 +61,10 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'larin_rest.urls'
 
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:3000',  # Добавьте ваш фронтенд-домен
+]
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',

@@ -5,6 +5,8 @@ from laboratory.serializers import *
 from laboratory.models import *
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes, authentication_classes, parser_classes
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from rest_framework.parsers import JSONParser
 from rest_framework.parsers import MultiPartParser, FormParser
 from laboratory.stocks.minio import add_pic, del_pic
@@ -21,6 +23,7 @@ from drf_yasg import openapi
 import hashlib
 
 # Create your views here.
+
 
 def hash_delivery(username, address, phone):
     input_string = f"{id}{address}{phone}{username}"
@@ -46,11 +49,12 @@ def hash_delivery(username, address, phone):
 def method_permission_classes(classes):
     def decorator(func):
         def decorated_func(self, *args, **kwargs):
-            self.permission_classes = classes        
+            self.permission_classes = classes
             self.check_permissions(self.request)
             return func(self, *args, **kwargs)
         return decorated_func
     return decorator
+
 
 def get_user(request):
     session_id = request.COOKIES.get("session_id")
@@ -66,21 +70,33 @@ def get_user(request):
             print("cant get user")
             user = None
             return user
-    
+
 
 class laboratory_catalog(APIView):
-    @swagger_auto_schema(responses={200: EquipmentResponseSerializer()})
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter(
+                'price',
+                openapi.IN_QUERY,
+                description="Price filter",
+                type=openapi.TYPE_NUMBER,
+                required=False
+            )
+        ],
+        responses={200: EquipmentResponseSerializer()}
+    )
     @method_permission_classes([AllowAny])
     def get(self, request, format=None):
         try:
             price = request.GET.get("price")
             print(price)
-            if price != None:
-                equipment = LaboratoryItem.objects.filter(price__lte = price)
+            if price is not None:
+                equipment = LaboratoryItem.objects.filter(price__lte=price)
             else:
                 equipment = LaboratoryItem.objects.all()
         except:
             equipment = LaboratoryItem.objects.all()
+
         serializer = EquipmentSerializer(equipment, many=True)
         printed_count = None
         selected_procurement_id = None
@@ -93,14 +109,14 @@ class laboratory_catalog(APIView):
             except LaboratoryOrder.DoesNotExist:
                 print('*' * 12)
                 print('Not auth')
+
         response = {
             "equipment": serializer.data,
             "procurement_id": selected_procurement_id,
             "procurement_count": printed_count,
         }
         return Response(response, status=status.HTTP_200_OK)
-    
-    
+
     @swagger_auto_schema(request_body=EquipmentSerializer)
     @method_permission_classes([IsAdminAuth])
     def post(self, request):
@@ -108,59 +124,59 @@ class laboratory_catalog(APIView):
         serializer = EquipmentSerializer(data=parsed_data)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK) 
+            return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 
 class laboratory_equipment(APIView):
     @swagger_auto_schema(responses={200: EquipmentSerializer()})
     @permission_classes([AllowAny])
     def get(self, request, id, format=None):
-        try: 
-            equipment = LaboratoryItem.objects.get(id=id) 
-        except LaboratoryItem.DoesNotExist: 
+        try:
+            equipment = LaboratoryItem.objects.get(id=id)
+        except LaboratoryItem.DoesNotExist:
             return Response({"message": "equipment not found"}, status=status.HTTP_400_BAD_REQUEST)
         serializer = EquipmentSerializer(equipment)
         response = serializer.data
         return Response(response, status=status.HTTP_200_OK)
-    
+
     @method_permission_classes([IsAdminAuth])
     @swagger_auto_schema(request_body=EquipmentSerializer)
     def put(self, request, id, format=None):
-        try: 
-            equipment = LaboratoryItem.objects.get(id=id) 
-        except LaboratoryItem.DoesNotExist: 
+        try:
+            equipment = LaboratoryItem.objects.get(id=id)
+        except LaboratoryItem.DoesNotExist:
             return Response({"message": "equipment not found"}, status=status.HTTP_400_BAD_REQUEST)
         parsed_data = JSONParser().parse(request)
         if 'pic' in parsed_data:
             pic_result = add_pic(equipment, parsed_data.initial_data['pic'])
             if 'error' in pic_result.data:
                 return Response({"message": pic_result}, status=status.HTTP_400_BAD_REQUEST)
-        serializer = EquipmentSerializer(equipment, data=parsed_data, partial=True) 
-        if serializer.is_valid(): 
-            serializer.save() 
-            return Response(serializer.data, status=status.HTTP_200_OK) 
+        serializer = EquipmentSerializer(
+            equipment, data=parsed_data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     @method_permission_classes([IsAdminAuth])
     def delete(self, request, id, format=None):
-        try: 
-            equipment = LaboratoryItem.objects.get(id=id) 
-        except LaboratoryItem.DoesNotExist: 
+        try:
+            equipment = LaboratoryItem.objects.get(id=id)
+        except LaboratoryItem.DoesNotExist:
             return Response({"message": "equipment not found"}, status=status.HTTP_400_BAD_REQUEST)
         pic_result = del_pic(equipment)
         if 'error' in pic_result:
             return Response({"message": pic_result}, status=status.HTTP_400_BAD_REQUEST)
-        equipment.delete() 
+        equipment.delete()
         return Response({"message": "equipment was deleted successfully!"}, status=status.HTTP_200_OK)
-    
+
     @method_permission_classes([IsAdminAuth])
     @swagger_auto_schema(request_body=EquipmentSerializer)
     def post(self, request, id, format=None):
-        try: 
-            equipment = LaboratoryItem.objects.get(id=id) 
-        except LaboratoryItem.DoesNotExist: 
+        try:
+            equipment = LaboratoryItem.objects.get(id=id)
+        except LaboratoryItem.DoesNotExist:
             return Response({"message": "equipment not found"}, status=status.HTTP_400_BAD_REQUEST)
         # Используем MultiPartParser для обработки файлов
         pic_file = request.FILES['pic']
@@ -171,65 +187,108 @@ class laboratory_equipment(APIView):
                 return Response({"message": pic_result}, status=status.HTTP_400_BAD_REQUEST)
             equipment.image = pic_result["message"]
             equipment.save()
-            serializer = EquipmentSerializer(LaboratoryItem.objects.get(id=id) ) 
+            serializer = EquipmentSerializer(LaboratoryItem.objects.get(id=id))
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response({"message": "not a image"}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class laboratory_procurements(APIView):
-    @swagger_auto_schema(responses={200: OrdersSerializer(many=True)},
-                         )
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter(
+                'status',
+                openapi.IN_QUERY,
+                description="Filter by status",
+                type=openapi.TYPE_INTEGER,
+                required=False
+            ),
+            openapi.Parameter(
+                'start_date',
+                openapi.IN_QUERY,
+                description="Start date for filtering",
+                type=openapi.TYPE_STRING,
+                format=openapi.FORMAT_DATE,
+                required=False
+            ),
+            openapi.Parameter(
+                'end_date',
+                openapi.IN_QUERY,
+                description="End date for filtering",
+                type=openapi.TYPE_STRING,
+                format=openapi.FORMAT_DATE,
+                required=False
+            )
+        ],
+        responses={200: OrdersSerializer(many=True)}
+    )
     def get(self, request):
         user = get_user(request)
         if user is None:
             return Response({"message": "no active session"}, status=status.HTTP_400_BAD_REQUEST)
+
+        status_filter = request.query_params.get('status')
+        start_date_filter = request.query_params.get('start_date')
+        end_date_filter = request.query_params.get('end_date')
+
         if user.is_superuser or user.is_staff:
-            orders =  LaboratoryOrder.objects.filter(status__gte = 3).order_by('created_date', 'status')   
+            orders = LaboratoryOrder.objects.filter(status__gte=3).order_by('created_date', 'status')
         else:
-            print("order start user") 
             orders = LaboratoryOrder.objects.filter(user=user)
+
+        if status_filter is not None:
+            orders = orders.filter(status=status_filter)
+        else:
+            orders = orders.filter(status__in=[3, 4])
+
+        if start_date_filter is not None and end_date_filter is not None:
+            start_date = datetime.strptime(start_date_filter, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_filter, '%Y-%m-%d').date()
+            orders = orders.filter(submitted_date__range=(start_date, end_date))
+
         if orders.count() == 0:
-            print("order start") 
-            return Response([],status=status.HTTP_200_OK)
+            return Response([], status=status.HTTP_200_OK)
+
         serializer = OrdersSerializer(orders, many=True)
         response = serializer.data
         return Response(response, status=status.HTTP_200_OK)
+
 
 class laboratory_procurement(APIView):
     @swagger_auto_schema(responses={200: OrdersSerializer()})
     def get(self, request, id):
         user = get_user(request)
-        try: 
-            procurement = LaboratoryOrder.objects.get(id=id, user=user) 
-        except LaboratoryOrder.DoesNotExist: 
+        try:
+            procurement = LaboratoryOrder.objects.get(id=id, user=user)
+        except LaboratoryOrder.DoesNotExist:
             return Response({"message": "procurement not found"}, status=status.HTTP_400_BAD_REQUEST)
         serializer = ProcurementSerializer(procurement)
         response = serializer.data
         return Response(response, status=status.HTTP_200_OK)
-    
+
     @swagger_auto_schema(request_body=EditProcurementSerializer,
                          responses={200: EditProcurementSerializer()})
     def put(self, request, id):
         user = get_user(request)
-        try: 
-            procurement = LaboratoryOrder.objects.get(id=id, user=user) 
-        except LaboratoryOrder.DoesNotExist: 
+        try:
+            procurement = LaboratoryOrder.objects.get(id=id, user=user)
+        except LaboratoryOrder.DoesNotExist:
             return Response({"message": "procurement not found"}, status=status.HTTP_400_BAD_REQUEST)
         parsed_data = JSONParser().parse(request)
-        serializer = EditProcurementSerializer(procurement, data=parsed_data, partial=True) 
-        if serializer.is_valid(): 
-            serializer.save() 
-            return Response(serializer.data) 
+        serializer = EditProcurementSerializer(
+            procurement, data=parsed_data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     def delete(self, request, id):
         user = get_user(request)
-        try: 
+        try:
             procurement = LaboratoryOrder.objects.get(id=id, user=user)
-        except LaboratoryOrder.DoesNotExist: 
+        except LaboratoryOrder.DoesNotExist:
             return Response({"message": "procurement not found"}, status=status.HTTP_400_BAD_REQUEST)
         procurement.status = 2
-        procurement.save() 
+        procurement.save()
         return Response({"message": "procurement was deleted successfully!"}, status=status.HTTP_200_OK)
 
 
@@ -245,19 +304,21 @@ def add_item(request, id):
     selected_user = request.user
     if selected_user is None:
         return Response({"message": "No session!"}, status=status.HTTP_400_BAD_REQUEST)
-    try: 
-        procurement = LaboratoryOrder.objects.get(user=selected_user, status=1) 
-    except LaboratoryOrder.DoesNotExist: 
+    try:
+        procurement = LaboratoryOrder.objects.get(user=selected_user, status=1)
+    except LaboratoryOrder.DoesNotExist:
         procurement = LaboratoryOrder(user=selected_user, status=1)
         procurement.save()
     try:
         equipment = LaboratoryItem.objects.get(id=id)
     except LaboratoryItem.DoesNotExist:
         return Response({"message": "equipment with id={id} does not exist"}, status=status.HTTP_400_BAD_REQUEST)
-    try: 
-        item = LaboratoryOrderItems.objects.get(order=procurement, product_id=equipment) 
-    except LaboratoryOrderItems.DoesNotExist: 
-        item = LaboratoryOrderItems(order=procurement, product_id=equipment, amount=0)
+    try:
+        item = LaboratoryOrderItems.objects.get(
+            order=procurement, product_id=equipment)
+    except LaboratoryOrderItems.DoesNotExist:
+        item = LaboratoryOrderItems(
+            order=procurement, product_id=equipment, amount=0)
     item.amount += parsed_data['amount']
     if item.amount <= 0:
         item.delete()
@@ -277,7 +338,7 @@ class user_registration(APIView):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         serializer = UserSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
+
     @swagger_auto_schema(request_body=EditUserSerializer,
                          responses={200: UserSerializer()})
     def put(self, request):
@@ -301,18 +362,15 @@ class user_registration(APIView):
 @api_view(['Post'])
 @permission_classes([AllowAny])
 def register(request, format=None):
-    #parsed_data = JSONParser().parse(request)
-    if User.objects.filter(username=request.data['username']).exists():
-        return Response({"message": "username exist!"}, status=status.HTTP_400_BAD_REQUEST)
     serializer = RegisterSerializer(data=request.data)
     if serializer.is_valid():
-        user = serializer.save()
+        serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @swagger_auto_schema(method='post', request_body=AuthSerializer,
-                     responses={200: UserSerializer()})
+                     responses={200: RegisterSerializer()})
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @authentication_classes([])
@@ -320,20 +378,20 @@ def user_auth(request):
     username = request.data.get("username")
     password = request.data.get("password")
     user = authenticate(request, username=username,
-                            password=password)
+                        password=password)
     if user is not None:
         login(request, user)
         random_key = str(uuid.uuid4())
         session_storage.set(random_key, username)
-        serializer = UserSerializer(user)
+        serializer = RegisterSerializer(user)
         response = Response(serializer.data, status=status.HTTP_200_OK)
         response.set_cookie("session_id", random_key, samesite="lax")
         return response
     else:
         return Response({"message": "Cant login",
-                             "username":username,
-                             "password":password},
-                            status=status.HTTP_400_BAD_REQUEST)
+                         "username": username,
+                         "password": password},
+                        status=status.HTTP_400_BAD_REQUEST)
 
 
 @swagger_auto_schema(method='post')
@@ -343,21 +401,24 @@ def user_deauth(request):
     if session_id is not None:
         session_storage.delete(session_id)
     logout(request._request)
-    return Response({'message': 'Success'})
+    response = Response({'message': 'Success'})
+    response.delete_cookie('session_id')
+    return response
 
 
 @swagger_auto_schema(method='post', responses={200: ProcurementSerializer()})
 @api_view(["POST"])
 def submit_procurement(request, id):
     user = get_user(request)
-    try: 
-        procurement = LaboratoryOrder.objects.get(id=id, status=1, user=user) 
-    except LaboratoryOrder.DoesNotExist: 
+    try:
+        procurement = LaboratoryOrder.objects.get(id=id, status=1, user=user)
+    except LaboratoryOrder.DoesNotExist:
         return Response({"message": "cant find procurement"}, status=status.HTTP_400_BAD_REQUEST)
     if procurement.phone != None and procurement.address != None:
         procurement.status = 3
         procurement.submited_date = datetime.datetime.now()
-        procurement.delivery_number = hash_delivery(procurement.user.username, procurement.address, procurement.phone)
+        procurement.delivery_number = hash_delivery(
+            procurement.user.username, procurement.address, procurement.phone)
         procurement.save()
         serializers = ProcurementSerializer(procurement)
         return Response(serializers.data, status=status.HTTP_200_OK)
@@ -369,9 +430,9 @@ def submit_procurement(request, id):
 @permission_classes([IsManagerAuth])
 def accept_procurement(request, id):
     user = get_user(request)
-    try: 
-        procurement = LaboratoryOrder.objects.get(id=id, status=3) 
-    except LaboratoryOrder.DoesNotExist: 
+    try:
+        procurement = LaboratoryOrder.objects.get(id=id, status=3)
+    except LaboratoryOrder.DoesNotExist:
         return Response({"message": "procurement not found"}, status=status.HTTP_200_OK)
     if procurement.phone != None and procurement.address != None and procurement.submited_date != None:
         procurement.status = 4
@@ -384,30 +445,31 @@ def accept_procurement(request, id):
 
 
 class one_item(APIView):
-    @swagger_auto_schema(request_body=ItemsSerializer, 
+    @swagger_auto_schema(request_body=AmountRequestSerializer(partial=True),
                          responses={200: ItemsSerializer(many=True)})
     def put(self, request, id):
-        user = user(request)
-        try: 
-            item = LaboratoryOrderItems.objects.get(id=id, order__user=user) 
-        except LaboratoryOrderItems.DoesNotExist: 
+        user = get_user(request)
+        try:
+            item = LaboratoryOrderItems.objects.get(id=id, order__user=user)
+        except LaboratoryOrderItems.DoesNotExist:
             return Response({"message": "cant get item"}, status=status.HTTP_400_BAD_REQUEST)
         parsed_data = JSONParser().parse(request)
-        serializer = ItemsSerializer(item, data=parsed_data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-        else:
+        if parsed_data["amount"] == None:
             return Response({"message": "Not valid"}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    
+        item.amount += parsed_data["amount"]
+        if item.amount <= 0:
+            item.delete()
+            return Response({"message": "Deleted"}, status=status.HTTP_200_OK)
+        else:
+            item.save()
+            serializer = ItemsSerializer(item)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
     def delete(self, request, id):
         user = user(request)
-        try: 
-            item = LaboratoryOrderItems.objects.get(id=id, order__user=user) 
-        except LaboratoryOrderItems.DoesNotExist: 
+        try:
+            item = LaboratoryOrderItems.objects.get(id=id, order__user=user)
+        except LaboratoryOrderItems.DoesNotExist:
             return Response({"message": "cant get item"}, status=status.HTTP_400_BAD_REQUEST)
         item.delete()
         return Response({"message": "Deleted succesfuly"}, status=status.HTTP_200_OK)
-        
-        
-

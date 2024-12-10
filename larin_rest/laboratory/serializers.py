@@ -67,7 +67,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     is_superuser = serializers.BooleanField(default=False, required=False)
     class Meta:
         model = User
-        fields = ['username','password','is_staff','is_superuser']
+        fields = ['username','password','is_staff','is_superuser', 'last_name', 'first_name']
     
     def create(self, validated_data):
         user = super().create(validated_data)
